@@ -2,6 +2,7 @@ from flask import Flask, render_template, request, jsonify
 from models import db, Run
 import json
 import math
+import os
 
 app = Flask(__name__)
 
@@ -93,15 +94,57 @@ def analyze_run(max_speed, zero_to_hundred, distance):
 # ROUTES
 # ==============================
 
+def read_settings():
+    defaults = {"speed_unit": "kmh", "distance_unit": "m", "accel_target": "100", "gps_accuracy": 20}
+    speed_unit = request.cookies.get("rb_speed_unit")
+    distance_unit = request.cookies.get("rb_distance_unit")
+    accel_target = request.cookies.get("rb_accel_target")
+    gps_accuracy = request.cookies.get("rb_gps_accuracy")
+    if speed_unit in {"kmh", "mph"}:
+        defaults["speed_unit"] = speed_unit
+    if distance_unit in {"m", "ft"}:
+        defaults["distance_unit"] = distance_unit
+    if accel_target in {"60", "100"}:
+        defaults["accel_target"] = accel_target
+    if gps_accuracy in {"10", "20", "35"}:
+        defaults["gps_accuracy"] = int(gps_accuracy)
+    return defaults
+
+
 @app.route("/")
 def index():
-    return render_template("index.html")
+    return render_template("index.html", settings=read_settings())
 
 
 @app.route("/history")
 def history():
     runs = Run.query.order_by(Run.created_at.desc()).all()
     return render_template("history.html", runs=runs)
+
+
+@app.route("/settings", methods=["GET", "POST"])
+def settings():
+    if request.method == "POST":
+        allowed_values = {
+            "speed_unit": {"kmh", "mph"},
+            "distance_unit": {"m", "ft"},
+            "accel_target": {"60", "100"},
+            "gps_accuracy": {"10", "20", "35"},
+        }
+        settings = {
+            key: request.form.get(key) if request.form.get(key) in allowed else default
+            for key, allowed, default in (
+                ("speed_unit", allowed_values["speed_unit"], "kmh"),
+                ("distance_unit", allowed_values["distance_unit"], "m"),
+                ("accel_target", allowed_values["accel_target"], "100"),
+                ("gps_accuracy", allowed_values["gps_accuracy"], "20"),
+            )
+        }
+        response = app.make_response(render_template("settings.html", settings={**settings, "gps_accuracy": int(settings["gps_accuracy"])}))
+        for key, value in settings.items():
+            response.set_cookie(f"rb_{key}", value, max_age=31536000, httponly=True, samesite="Lax")
+        return response
+    return render_template("settings.html", settings=read_settings())
 
 
 # ==============================
@@ -188,4 +231,4 @@ def get_run(run_id):
 if __name__ == "__main__":
     with app.app_context():
         db.create_all()
-    app.run(debug=True)
+    app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 5000)), debug=True)
