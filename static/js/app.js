@@ -1,7 +1,10 @@
-const map = L.map('map', { zoomControl: false }).setView([-6.2, 106.8], 5);
+const map = L.map('map', { zoomControl: false }).setView([0, 0], 2);
 L.control.zoom({ position: 'bottomright' }).addTo(map);
-L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '© OpenStreetMap contributors' }).addTo(map);
+const tileLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '© OpenStreetMap contributors' }).addTo(map);
+tileLayer.on('tileerror', () => { document.getElementById('mapHint').textContent = 'Peta tidak dapat dimuat. Periksa koneksi internet, lalu muat ulang halaman.'; });
 const routeLine = L.polyline([], { color: '#f07835', weight: 4, opacity: 0.95 }).addTo(map);
+let currentLocationMarker = null;
+let accuracyCircle = null;
 let watchId = null;
 let lastPosition = null;
 let totalDistance = 0;
@@ -14,7 +17,7 @@ let startedAt = null;
 let timerId = null;
 let isTracking = false;
 const $ = (id) => document.getElementById(id);
-const settings = window.raceboxSettings || { speed_unit: 'kmh', distance_unit: 'm', accel_target: '100', gps_accuracy: 20 };
+const settings = window.raceboxSettings || { speed_unit: 'kmh', distance_unit: 'm', accel_target: '100', gps_accuracy: 35 };
 const speedFactor = settings.speed_unit === 'mph' ? 0.621371 : 1;
 const distanceFactor = settings.distance_unit === 'ft' ? 3.28084 : 1;
 const accelerationTarget = Number(settings.accel_target || 100);
@@ -34,10 +37,15 @@ function haversine(lat1, lon1, lat2, lon2) {
     const a = Math.sin(dLat / 2) ** 2 + Math.cos(toRadians(lat1)) * Math.cos(toRadians(lat2)) * Math.sin(dLon / 2) ** 2;
     return 6371000 * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 }
-function setGpsStatus(message, connected = false) {
+function setGpsStatus(message, state = 'ready') {
+    const labels = { ready: 'GPS SIAP', searching: 'MENCARI GPS…', connected: 'GPS TERHUBUNG', error: 'IZIN / SINYAL GPS' };
     $('gpsStatus').textContent = message;
-    $('gpsPill').textContent = connected ? 'GPS TERHUBUNG' : 'GPS SIAP';
-    document.querySelectorAll('.status-dot').forEach(dot => dot.classList.toggle('connected', connected));
+    $('gpsPill').textContent = labels[state] || labels.ready;
+    document.querySelectorAll('.status-dot').forEach(dot => {
+        dot.classList.toggle('connected', state === 'connected');
+        dot.classList.toggle('searching', state === 'searching');
+        dot.classList.toggle('gps-error', state === 'error');
+    });
 }
 function updateTimer() {
     if (!startedAt) return;
@@ -45,7 +53,12 @@ function updateTimer() {
     $('elapsed').textContent = `${String(Math.floor(seconds / 60)).padStart(2, '0')}:${String(Math.floor(seconds % 60)).padStart(2, '0')}.${Math.floor((seconds % 1) * 10)}`;
 }
 function startTracking() {
-    if (!navigator.geolocation) { alert('Perangkat ini tidak mendukung GPS.'); return; }
+    if (!navigator.geolocation) {
+        const message = 'Browser ini tidak menyediakan GPS. Buka melalui HTTPS di browser yang mendukung lokasi.';
+        setGpsStatus(message, 'error');
+        $('mapHint').textContent = message;
+        return;
+    }
     if (isTracking) return;
     if (routeCoordinates.length) resetTracking();
     isTracking = true;
@@ -55,26 +68,40 @@ function startTracking() {
     $('stopButton').disabled = false;
     $('trackState').textContent = 'MEREKAM';
     $('mapHint').textContent = 'Sedang merekam posisi GPS';
-    setGpsStatus('Mencari sinyal GPS…');
-    watchId = navigator.geolocation.watchPosition(updatePosition, handleGpsError, { enableHighAccuracy: true, maximumAge: 0, timeout: 15000 });
+    setGpsStatus('Meminta izin lokasi dan mencari sinyal GPS…', 'searching');
+    watchId = navigator.geolocation.watchPosition(updatePosition, handleGpsError, { enableHighAccuracy: true, maximumAge: 0, timeout: 60000 });
 }
 function updatePosition(position) {
     const { latitude, longitude, accuracy, speed: gpsSpeed } = position.coords;
+    const point = [latitude, longitude];
     $('accuracyLabel').textContent = `AKURASI GPS ±${Math.round(accuracy)} M`;
     $('deviceAccuracy').textContent = `±${Math.round(accuracy)} meter`;
-    setGpsStatus('Sinyal terhubung', true);
-    if (accuracy > Number(settings.gps_accuracy || 20)) { lastPosition = null; $('mapHint').textContent = `Menunggu akurasi GPS ±${settings.gps_accuracy} m`; return; }
-    const point = [latitude, longitude];
+    $('coords').textContent = `${latitude.toFixed(5)}, ${longitude.toFixed(5)}`;
+    setGpsStatus('Sinyal lokasi diterima', 'connected');
+
+    if (!accuracyCircle) {
+        accuracyCircle = L.circle(point, { radius: Math.max(5, Math.min(accuracy, 500)), color: '#f07835', weight: 1, fillColor: '#f07835', fillOpacity: 0.12 }).addTo(map);
+        currentLocationMarker = L.circleMarker(point, { radius: 7, color: '#fff', weight: 2, fillColor: '#f07835', fillOpacity: 1 }).addTo(map);
+        map.setView(point, 16);
+    } else {
+        accuracyCircle.setLatLng(point).setRadius(Math.max(5, Math.min(accuracy, 500)));
+        currentLocationMarker.setLatLng(point);
+        if (isTracking) map.panTo(point, { animate: false });
+    }
+
+    if (accuracy > Number(settings.gps_accuracy || 35)) {
+        lastPosition = null;
+        $('mapHint').textContent = `Lokasi terlihat, tetapi akurasi ±${Math.round(accuracy)} m belum memenuhi filter ±${settings.gps_accuracy} m. Longgarkan filter di Pengaturan.`;
+        return;
+    }
     routeCoordinates.push(point);
     routeLine.addLatLng(point);
-    if (routeCoordinates.length === 1) map.setView(point, 17);
-    else map.panTo(point, { animate: false });
-    $('coords').textContent = `${latitude.toFixed(5)}, ${longitude.toFixed(5)}`;
+    $('mapHint').textContent = 'Lokasi GPS terkunci · merekam lintasan';
     let currentSpeed = Number.isFinite(gpsSpeed) && gpsSpeed >= 0 ? gpsSpeed * 3.6 : 0;
     if (lastPosition) {
         const distance = haversine(lastPosition.coords.latitude, lastPosition.coords.longitude, latitude, longitude);
         const elapsed = (position.timestamp - lastPosition.timestamp) / 1000;
-        if (!Number.isFinite(gpsSpeed) && elapsed > 0) currentSpeed = (distance / elapsed) * 3.6;
+        if ((!Number.isFinite(gpsSpeed) || gpsSpeed <= 0) && elapsed > 0 && distance > Math.max(2, accuracy * 0.25) && distance < 80) currentSpeed = (distance / elapsed) * 3.6;
         if (distance < 80) totalDistance += distance;
     }
     $('speed').textContent = Math.round(currentSpeed * speedFactor);
@@ -94,11 +121,16 @@ function updatePosition(position) {
     lastPosition = position;
 }
 function handleGpsError(error) {
-    const messages = { 1: 'Izin lokasi ditolak', 2: 'Sinyal GPS tidak tersedia', 3: 'Waktu pencarian GPS habis' };
-    setGpsStatus(messages[error.code] || 'GPS bermasalah');
-    $('trackState').textContent = 'GPS ERROR';
+    const messages = {
+        1: 'Izin lokasi ditolak. Izinkan lokasi untuk situs ini di pengaturan browser.',
+        2: 'Sinyal GPS tidak tersedia. Aktifkan layanan lokasi perangkat dan coba di area terbuka.',
+        3: 'GPS belum mendapat fix setelah 60 detik. Coba lagi di area terbuka dengan lokasi presisi aktif.'
+    };
+    const message = messages[error.code] || 'GPS bermasalah. Periksa izin lokasi dan coba lagi.';
     stopTracking(false);
-    alert(`${messages[error.code] || 'GPS tidak tersedia'}. Pastikan izin lokasi aktif dan halaman dibuka melalui koneksi aman.`);
+    setGpsStatus(message, 'error');
+    $('trackState').textContent = 'GPS ERROR';
+    $('mapHint').textContent = message;
 }
 async function stopTracking(save = true) {
     if (watchId !== null) navigator.geolocation.clearWatch(watchId);
@@ -120,8 +152,14 @@ async function stopTracking(save = true) {
 function resetTracking() {
     if (isTracking) stopTracking(false);
     lastPosition = null; totalDistance = 0; maxSpeed = 0; zeroStart = null; zeroDone = false; routeCoordinates = []; telemetryValues = []; startedAt = null;
-    $('speed').textContent = '0'; $('speedBar').style.width = '0%'; $('maxSpeed').textContent = '0.0'; $('zeroToHundred').textContent = '—'; $('distance').textContent = '0'; $('elapsed').textContent = '00:00.0'; $('coords').textContent = 'MENUNGGU SINYAL GPS'; $('accuracyLabel').textContent = 'AKURASI GPS —'; $('deviceAccuracy').textContent = 'Menunggu GPS'; $('trackState').textContent = 'SIAP'; $('mapHint').textContent = 'Mulai run untuk merekam lintasan';
-    routeLine.setLatLngs([]); map.setView([-6.2, 106.8], 5); speedData.labels = []; speedData.datasets[0].data = []; chart.update(); setGpsStatus('Belum tersambung');
+    $('speed').textContent = '0'; $('speedBar').style.width = '0%'; $('maxSpeed').textContent = '0.0'; $('zeroToHundred').textContent = '—'; $('distance').textContent = '0'; $('elapsed').textContent = '00:00.0'; $('coords').textContent = 'MENUNGGU SINYAL GPS'; $('accuracyLabel').textContent = 'AKURASI GPS —'; $('deviceAccuracy').textContent = 'Menunggu GPS'; $('trackState').textContent = 'SIAP'; $('mapHint').textContent = 'Mulai GPS untuk menampilkan posisi. Izinkan akses lokasi di browser.';
+    routeLine.setLatLngs([]);
+    if (currentLocationMarker) map.removeLayer(currentLocationMarker);
+    if (accuracyCircle) map.removeLayer(accuracyCircle);
+    currentLocationMarker = null;
+    accuracyCircle = null;
+    map.setView([0, 0], 2);
+    speedData.labels = []; speedData.datasets[0].data = []; chart.update(); setGpsStatus('Belum tersambung', 'ready');
 }
 $('startButton').addEventListener('click', startTracking);
 $('stopButton').addEventListener('click', () => stopTracking());

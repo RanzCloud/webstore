@@ -1,4 +1,4 @@
-const settings = window.raceboxSettings || { speed_unit: 'kmh', distance_unit: 'm', gps_accuracy: 20 };
+const settings = window.raceboxSettings || { speed_unit: 'kmh', distance_unit: 'm', gps_accuracy: 35 };
 const speedFactor = settings.speed_unit === 'mph' ? 0.621371 : 1;
 const distanceFactor = settings.distance_unit === 'ft' ? 3.28084 : 1;
 const speedLabel = settings.speed_unit === 'mph' ? 'mph' : 'km/h';
@@ -29,11 +29,15 @@ function distanceBetween(a, b) {
     const value = Math.sin(dLat / 2) ** 2 + Math.cos(lat1) * Math.cos(lat2) * Math.sin(dLon / 2) ** 2;
     return 6371000 * 2 * Math.atan2(Math.sqrt(value), Math.sqrt(1 - value));
 }
-function setGps(message, connected = false) {
+function setGps(message, state = 'ready') {
+    const labels = { ready: 'GPS SIAP', searching: 'MENCARI GPS…', connected: 'GPS TERHUBUNG', error: 'IZIN / SINYAL GPS' };
     $('gpsStatus').textContent = message;
-    $('gpsPill').textContent = connected ? 'GPS TERHUBUNG' : 'GPS SIAP';
-    $('gpsDot').classList.toggle('connected', connected);
-    $('sideGpsDot').classList.toggle('connected', connected);
+    $('gpsPill').textContent = labels[state] || labels.ready;
+    for (const dot of [$('gpsDot'), $('sideGpsDot')]) {
+        dot.classList.toggle('connected', state === 'connected');
+        dot.classList.toggle('searching', state === 'searching');
+        dot.classList.toggle('gps-error', state === 'error');
+    }
 }
 function formatTime(milliseconds) {
     const safe = Math.max(0, milliseconds);
@@ -63,10 +67,10 @@ function updateDistanceDisplay() {
 function handlePosition(position) {
     const { latitude, longitude, accuracy, speed: gpsSpeed } = position.coords;
     $('accuracyLabel').textContent = `AKURASI GPS ±${Math.round(accuracy)} M`;
-    setGps('Sinyal terhubung', true);
-    if (accuracy > Number(settings.gps_accuracy || 20)) {
+    setGps('Sinyal lokasi diterima', 'connected');
+    if (accuracy > Number(settings.gps_accuracy || 35)) {
         lastPosition = null;
-        $('dragHint').textContent = `Menunggu akurasi GPS ±${settings.gps_accuracy} m atau lebih baik.`;
+        $('dragHint').textContent = `GPS mendapat lokasi, tetapi akurasinya ±${Math.round(accuracy)} m. Atur filter hingga ±${settings.gps_accuracy} m atau lebih longgar di Pengaturan.`;
         return;
     }
 
@@ -76,7 +80,7 @@ function handlePosition(position) {
     if (lastPosition) {
         const elapsed = (position.timestamp - lastPosition.timestamp) / 1000;
         segmentDistance = distanceBetween(lastPosition, position);
-        if (speedKmh === 0 && elapsed > 0 && segmentDistance < 80) speedKmh = segmentDistance / elapsed * 3.6;
+        if (speedKmh === 0 && elapsed > 0 && segmentDistance > Math.max(2, accuracy * 0.25) && segmentDistance < 80) speedKmh = segmentDistance / elapsed * 3.6;
     }
 
     if (!isRunning && speedKmh >= 3) {
@@ -124,15 +128,22 @@ function handlePosition(position) {
     }
 }
 function handleGpsError(error) {
-    const messages = { 1: 'Izin lokasi ditolak', 2: 'Sinyal GPS tidak tersedia', 3: 'Waktu pencarian GPS habis' };
-    setGps(messages[error.code] || 'GPS bermasalah');
+    const messages = {
+        1: 'Izin lokasi ditolak. Izinkan lokasi untuk situs ini di pengaturan browser.',
+        2: 'Sinyal GPS tidak tersedia. Aktifkan layanan lokasi perangkat dan coba di area terbuka.',
+        3: 'GPS belum mendapat fix setelah 60 detik. Aktifkan lokasi presisi dan coba lagi di area terbuka.'
+    };
+    const message = messages[error.code] || 'GPS bermasalah. Periksa izin lokasi dan coba lagi.';
     disarmTimer(false);
+    setGps(message, 'error');
     $('dragStatus').textContent = 'GPS TIDAK SIAP';
-    alert(`${messages[error.code] || 'GPS tidak tersedia'}. Aktifkan izin lokasi dan buka halaman melalui koneksi aman.`);
+    $('dragHint').textContent = message;
 }
 function armTimer() {
     if (!navigator.geolocation) {
-        alert('Perangkat ini tidak mendukung GPS.');
+        const message = 'Browser ini tidak menyediakan GPS. Buka melalui HTTPS di browser yang mendukung lokasi.';
+        setGps(message, 'error');
+        $('dragHint').textContent = message;
         return;
     }
     if (isArmed || isRunning) return;
@@ -143,8 +154,8 @@ function armTimer() {
     $('dragHint').textContent = 'Timer siap. Mulai bergerak untuk memulai pencatatan waktu.';
     $('armButton').disabled = true;
     $('stopDragButton').disabled = false;
-    watchId = navigator.geolocation.watchPosition(handlePosition, handleGpsError, { enableHighAccuracy: true, maximumAge: 0, timeout: 15000 });
-    setGps('Mencari sinyal GPS…');
+    watchId = navigator.geolocation.watchPosition(handlePosition, handleGpsError, { enableHighAccuracy: true, maximumAge: 0, timeout: 60000 });
+    setGps('Meminta izin lokasi dan mencari sinyal GPS…', 'searching');
 }
 async function disarmTimer(save = true) {
     if (watchId !== null && navigator.geolocation) navigator.geolocation.clearWatch(watchId);
@@ -209,11 +220,11 @@ function resetTimer() {
     $('distanceProgress').style.width = '0%';
     $('progressDistance').textContent = `0 / ${Math.round(402 * distanceFactor)} ${distanceLabel}`;
     $('dragStatus').textContent = 'SIAP DI GARIS START';
-    $('dragHint').textContent = 'Pasang GPS dengan sinyal baik. Timer mulai otomatis saat motor bergerak.';
+    $('dragHint').textContent = 'Izinkan lokasi browser. Timer mulai otomatis saat GPS mendeteksi motor bergerak.';
     $('armButton').disabled = false;
     $('stopDragButton').disabled = true;
     $('armedDot').classList.remove('active');
-    setGps('GPS SIAP');
+    setGps('Belum tersambung', 'ready');
 }
 $('armButton').addEventListener('click', armTimer);
 $('stopDragButton').addEventListener('click', () => disarmTimer());
