@@ -1,54 +1,57 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="id">
 <head>
     <meta charset="UTF-8">
-    <title>RACEBOX WEB CYBERPUNK</title>
     <meta name="viewport" content="width=device-width, initial-scale=1">
-
-    <!-- Leaflet -->
-    <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css"/>
-    <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
-
-    <!-- Chart.js -->
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-
+    <meta name="theme-color" content="#101113">
+    <meta name="description" content="RaceBox Garage — GPS performance meter untuk drag bike.">
+    <title>RaceBox Garage — GPS Meter</title>
+    <link rel="preconnect" href="https://unpkg.com">
+    <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
 </head>
-<body>
+<body class="app-shell">
+    <aside class="sidebar">
+        <a class="brand" href="/" aria-label="RaceBox Garage beranda"><span class="brand-mark">R</span><span>RACEBOX <b>GARAGE</b></span></a>
+        <p class="nav-label">MENU UTAMA</p>
+        <nav class="main-nav" aria-label="Navigasi utama">
+            <a class="nav-link active" href="/" aria-current="page"><span class="nav-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8.5"/><circle cx="12" cy="12" r="3"/></svg></span> GPS Meter</a>
+            <a class="nav-link" href="/drag"><span class="nav-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="13" r="8"/><path d="M12 13l4-4M9 2h6M12 5v2"/></svg></span> Drag Timer</a>
+            <a class="nav-link" href="/history"><span class="nav-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8.5"/><path d="M12 7v5l3 2"/></svg></span> Riwayat Run</a>
+            <a class="nav-link" href="/settings"><span class="nav-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v2m0 14v2M3 12h2m14 0h2M5.64 5.64l1.42 1.42m9.88 9.88 1.42 1.42m0-12.72-1.42 1.42m-9.88 9.88-1.42 1.42"/><circle cx="12" cy="12" r="5"/></svg></span> Pengaturan</a>
+        </nav>
+        <div class="sidebar-device"><span class="status-dot"></span><div><strong>GPS DEVICE</strong><small id="gpsStatus">Belum tersambung</small></div></div>
+        <div class="sidebar-footer">RACEBOX GARAGE <span>GPS PERFORMANCE METER</span></div>
+    </aside>
 
-<header>
-    <h1>RACEBOX WEB</h1>
-    <div id="speed">0</div>
-    <span class="unit">km/h</span>
-</header>
+    <main class="main-content">
+        <header class="topbar"><div><p class="eyebrow">DRAG BIKE PERFORMANCE</p><h1>GPS Meter</h1></div><div class="topbar-right"><span class="gps-pill"><i class="status-dot"></i><span id="gpsPill">GPS SIAP</span></span><a class="icon-link" href="/settings" aria-label="Buka pengaturan"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v2m0 14v2M3 12h2m14 0h2M5.64 5.64l1.42 1.42m9.88 9.88 1.42 1.42m0-12.72-1.42 1.42m-9.88 9.88-1.42 1.42"/><circle cx="12" cy="12" r="5"/></svg></a></div></header>
+        <section class="meter-layout" aria-label="Pengukuran kecepatan">
+            <div class="panel speed-panel">
+                <div class="panel-heading"><div><span class="eyebrow">KECEPATAN SAAT INI</span><span class="live-label"><i></i> LIVE</span></div><span class="signal-label" id="accuracyLabel">AKURASI GPS —</span></div>
+                <div class="speed-reading"><span id="speed">0</span><span class="speed-unit">km/h</span></div>
+                <div class="speed-scale"><span>0</span><span>50</span><span>100</span><span>150</span><span>200</span><span>250</span></div>
+                <div class="speed-track"><span id="speedBar"></span></div>
+                <div class="speed-foot"><span>GPS SPEED</span><span id="coords">MENUNGGU SINYAL GPS</span></div>
+            </div>
+            <div class="metric-stack">
+                <div class="panel metric-card"><span class="eyebrow">TOP SPEED</span><div><strong id="maxSpeed">0.0</strong><small>km/h</small></div><span class="metric-note">KECEPATAN MAKSIMUM</span></div>
+                <div class="panel metric-card"><span class="eyebrow">0–100 KM/H</span><div><strong id="zeroToHundred">—</strong><small id="accelUnit">detik</small></div><span class="metric-note">AKSELERASI</span></div>
+                <div class="panel metric-card"><span class="eyebrow">JARAK RUN</span><div><strong id="distance">0</strong><small>m</small></div><span class="metric-note">TOTAL JARAK</span></div>
+            </div>
+        </section>
 
-<section id="dashboard">
-    <div class="card">
-        <h3>MAX SPEED</h3>
-        <p id="maxSpeed">0 km/h</p>
-    </div>
-    <div class="card">
-        <h3>DISTANCE</h3>
-        <p id="distance">0 m</p>
-    </div>
-    <div class="card">
-        <h3>0-100 KM/H</h3>
-        <p id="zeroToHundred">-</p>
-    </div>
-</section>
+        <section class="content-grid">
+            <div class="panel map-panel"><div class="section-heading"><div><span class="eyebrow">TRACKING</span><h2>Lintasan GPS</h2></div><span class="map-live"><i class="status-dot"></i> <span id="trackState">SIAP</span></span></div><div id="map" role="application" aria-label="Peta lintasan GPS"></div><div class="map-caption"><span><i class="legend-line"></i> RUTE RUN</span><span id="mapHint">Mulai run untuk merekam lintasan</span></div></div>
+            <div class="panel chart-panel"><div class="section-heading"><div><span class="eyebrow">TELEMETRI</span><h2>Kecepatan</h2></div><span class="chart-unit">km/h</span></div><div class="chart-wrap"><canvas id="speedChart" aria-label="Grafik kecepatan"></canvas></div><div class="chart-footer"><span>WAKTU RUN</span><strong id="elapsed">00:00.0</strong></div></div>
+        </section>
 
-<section id="map"></section>
-
-<section id="chart-container">
-    <canvas id="speedChart"></canvas>
-</section>
-
-<div class="controls">
-    <button onclick="startTracking()" class="start">START</button>
-    <button onclick="stopTracking()" class="stop">STOP</button>
-    <button onclick="resetTracking()" class="reset">RESET</button>
-</div>
-
-<script src="{{ url_for('static', filename='js/app.js') }}"></script>
+        <section class="bottom-row"><div class="panel run-info"><div><span class="eyebrow">MODE PENGUKURAN</span><strong>DRAG BIKE <span>·</span> GPS TRACKING</strong></div><div><span class="eyebrow">AKURASI PERANGKAT</span><strong id="deviceAccuracy">Menunggu GPS</strong></div><div class="run-actions"><a href="/drag" class="button button-secondary">DRAG TIMER</a><button type="button" id="startButton" class="button button-primary"><span>▶</span> MULAI RUN</button><button type="button" id="stopButton" class="button button-secondary" disabled><span>■</span> SELESAI</button><button type="button" id="resetButton" class="button button-ghost">RESET</button></div></section>
+        <p class="safety-note">Gunakan hanya di lintasan tertutup. Jangan mengoperasikan perangkat saat berkendara.</p>
+    </main>
+    <script src="https://unpkg.com/leaflet/dist/leaflet.js" defer></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js" defer></script>
+    <script>window.raceboxSettings = {{ settings|tojson }};</script>
+    <script src="{{ url_for('static', filename='js/app.js') }}" defer></script>
 </body>
 </html>
