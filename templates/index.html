@@ -16,6 +16,7 @@
         <p class="nav-label">MENU UTAMA</p>
         <nav class="main-nav" aria-label="Navigasi utama">
             <a class="nav-link active" href="/" aria-current="page"><span class="nav-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8.5"/><circle cx="12" cy="12" r="3"/></svg></span> GPS Meter</a>
+            <a class="nav-link" href="/drag"><span class="nav-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="13" r="8"/><path d="M12 13l4-4M9 2h6M12 5v2"/></svg></span> Drag Timer</a>
             <a class="nav-link" href="/history"><span class="nav-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8.5"/><path d="M12 7v5l3 2"/></svg></span> Riwayat Run</a>
             <a class="nav-link" href="/settings"><span class="nav-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v2m0 14v2M3 12h2m14 0h2M5.64 5.64l1.42 1.42m9.88 9.88 1.42 1.42m0-12.72-1.42 1.42m-9.88 9.88-1.42 1.42"/><circle cx="12" cy="12" r="5"/></svg></span> Pengaturan</a>
         </nav>
@@ -45,7 +46,7 @@
             <div class="panel chart-panel"><div class="section-heading"><div><span class="eyebrow">TELEMETRI</span><h2>Kecepatan</h2></div><span class="chart-unit">km/h</span></div><div class="chart-wrap"><canvas id="speedChart" aria-label="Grafik kecepatan"></canvas></div><div class="chart-footer"><span>WAKTU RUN</span><strong id="elapsed">00:00.0</strong></div></div>
         </section>
 
-        <section class="bottom-row"><div class="panel run-info"><div><span class="eyebrow">MODE PENGUKURAN</span><strong>DRAG BIKE <span>·</span> GPS 10 HZ</strong></div><div><span class="eyebrow">AKURASI PERANGKAT</span><strong id="deviceAccuracy">Menunggu GPS</strong></div><div class="run-actions"><button type="button" id="startButton" class="button button-primary"><span>▶</span> MULAI RUN</button><button type="button" id="stopButton" class="button button-secondary" disabled><span>■</span> SELESAI</button><button type="button" id="resetButton" class="button button-ghost">RESET</button></div></section>
+        <section class="bottom-row"><div class="panel run-info"><div><span class="eyebrow">MODE PENGUKURAN</span><strong>DRAG BIKE <span>·</span> GPS TRACKING</strong></div><div><span class="eyebrow">AKURASI PERANGKAT</span><strong id="deviceAccuracy">Menunggu GPS</strong></div><div class="run-actions"><a href="/drag" class="button button-secondary">DRAG TIMER</a><button type="button" id="startButton" class="button button-primary"><span>▶</span> MULAI RUN</button><button type="button" id="stopButton" class="button button-secondary" disabled><span>■</span> SELESAI</button><button type="button" id="resetButton" class="button button-ghost">RESET</button></div></section>
         <p class="safety-note">Gunakan hanya di lintasan tertutup. Jangan mengoperasikan perangkat saat berkendara.</p>
     </main>
     <script src="https://unpkg.com/leaflet/dist/leaflet.js" defer></script>

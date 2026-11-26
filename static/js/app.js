@@ -111,7 +111,7 @@ async function stopTracking(save = true) {
     $('mapHint').textContent = routeCoordinates.length ? `${routeCoordinates.length} titik GPS terekam` : 'Tidak ada titik GPS terekam';
     if (!save || routeCoordinates.length < 2 || totalDistance < 10) return;
     try {
-        const response = await fetch('/api/save_run', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ max_speed: maxSpeed, zero_to_hundred: zeroDone ? Number($('zeroToHundred').textContent) : null, distance: totalDistance, route_data: routeCoordinates, telemetry_data: telemetryValues }) });
+        const response = await fetch('/api/save_run', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ max_speed: maxSpeed, zero_to_hundred: zeroDone && accelerationTarget === 100 ? Number($('zeroToHundred').textContent) : null, distance: totalDistance, route_data: routeCoordinates, telemetry_data: telemetryValues }) });
         const result = await response.json();
         if (!response.ok) throw new Error(result.error || 'Run gagal disimpan');
         $('mapHint').textContent = `Run tersimpan · ${result.analysis}`;

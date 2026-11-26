@@ -116,6 +116,11 @@ def index():
     return render_template("index.html", settings=read_settings())
 
 
+@app.route("/drag")
+def drag_timer():
+    return render_template("drag.html", settings=read_settings())
+
+
 @app.route("/history")
 def history():
     runs = Run.query.order_by(Run.created_at.desc()).all()
