@@ -95,7 +95,7 @@ def analyze_run(max_speed, zero_to_hundred, distance):
 # ==============================
 
 def read_settings():
-    defaults = {"speed_unit": "kmh", "distance_unit": "m", "accel_target": "100", "gps_accuracy": 20}
+    defaults = {"speed_unit": "kmh", "distance_unit": "m", "accel_target": "100", "gps_accuracy": 35}
     speed_unit = request.cookies.get("rb_speed_unit")
     distance_unit = request.cookies.get("rb_distance_unit")
     accel_target = request.cookies.get("rb_accel_target")
@@ -106,7 +106,7 @@ def read_settings():
         defaults["distance_unit"] = distance_unit
     if accel_target in {"60", "100"}:
         defaults["accel_target"] = accel_target
-    if gps_accuracy in {"10", "20", "35"}:
+    if gps_accuracy in {"10", "20", "35", "50"}:
         defaults["gps_accuracy"] = int(gps_accuracy)
     return defaults
 
@@ -134,7 +134,7 @@ def settings():
             "speed_unit": {"kmh", "mph"},
             "distance_unit": {"m", "ft"},
             "accel_target": {"60", "100"},
-            "gps_accuracy": {"10", "20", "35"},
+            "gps_accuracy": {"10", "20", "35", "50"},
         }
         settings = {
             key: request.form.get(key) if request.form.get(key) in allowed else default
@@ -142,7 +142,7 @@ def settings():
                 ("speed_unit", allowed_values["speed_unit"], "kmh"),
                 ("distance_unit", allowed_values["distance_unit"], "m"),
                 ("accel_target", allowed_values["accel_target"], "100"),
-                ("gps_accuracy", allowed_values["gps_accuracy"], "20"),
+                ("gps_accuracy", allowed_values["gps_accuracy"], "35"),
             )
         }
         response = app.make_response(render_template("settings.html", settings={**settings, "gps_accuracy": int(settings["gps_accuracy"])}))
